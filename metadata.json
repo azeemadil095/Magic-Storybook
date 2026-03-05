@@ -1,0 +1,5 @@
+{
+  "name": "Remix: Magic Storybook",
+  "description": "An app for kids that reads stories aloud, generates illustrations, and features an AI chatbot.",
+  "requestFramePermissions": []
+}
