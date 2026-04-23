@@ -2,23 +2,14 @@ import { useState, useEffect } from 'react';
 import { generateImage, generateSpeech, playPcmAudio } from '../lib/gemini';
 import { ChevronLeft, ChevronRight, Volume2, Loader2, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
-interface Page {
-  text: string;
-  imagePrompt: string;
-  imageUrl?: string;
-}
-
-interface Story {
-  title: string;
-  pages: Page[];
-}
+import type { Page, Story } from '../types/story';
 
 export function StoryReader({ story, imageSize }: { story: Story, imageSize: string }) {
   const [currentPage, setCurrentPage] = useState(0);
   const [pages, setPages] = useState<Page[]>(story.pages);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const page = pages[currentPage];
 
@@ -30,6 +21,7 @@ export function StoryReader({ story, imageSize }: { story: Story, imageSize: str
   const handleGenerateImage = async () => {
     if (page.imageUrl || isGeneratingImage) return;
     setIsGeneratingImage(true);
+    setErrorMessage('');
     try {
       const url = await generateImage(page.imagePrompt, imageSize);
       setPages(prev => {
@@ -39,7 +31,7 @@ export function StoryReader({ story, imageSize }: { story: Story, imageSize: str
       });
     } catch (e) {
       console.error("Failed to generate image", e);
-      alert("Failed to generate image. Please try again.");
+      setErrorMessage('Failed to generate image. Please try again.');
     } finally {
       setIsGeneratingImage(false);
     }
@@ -118,6 +110,7 @@ export function StoryReader({ story, imageSize }: { story: Story, imageSize: str
           
           <div className="mt-8 flex items-center justify-between pt-6 border-t border-gray-100">
             <button 
+              aria-label={isPlayingAudio ? 'Reading page aloud' : 'Read this page aloud'}
               onClick={handleReadAloud}
               disabled={isPlayingAudio}
               className={`flex items-center gap-2 px-5 py-3 rounded-xl font-medium transition-all ${
@@ -132,6 +125,7 @@ export function StoryReader({ story, imageSize }: { story: Story, imageSize: str
 
             <div className="flex items-center gap-3">
               <button 
+                aria-label="Go to previous page"
                 onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
                 disabled={currentPage === 0}
                 className="p-3 rounded-full bg-gray-100 text-gray-600 disabled:opacity-50 hover:bg-gray-200 transition-colors cursor-pointer"
@@ -142,6 +136,7 @@ export function StoryReader({ story, imageSize }: { story: Story, imageSize: str
                 {currentPage + 1} / {pages.length}
               </span>
               <button 
+                aria-label="Go to next page"
                 onClick={() => setCurrentPage(p => Math.min(pages.length - 1, p + 1))}
                 disabled={currentPage === pages.length - 1}
                 className="p-3 rounded-full bg-gray-100 text-gray-600 disabled:opacity-50 hover:bg-gray-200 transition-colors cursor-pointer"
@@ -150,6 +145,11 @@ export function StoryReader({ story, imageSize }: { story: Story, imageSize: str
               </button>
             </div>
           </div>
+          {errorMessage && (
+            <p className="mt-4 text-sm text-red-600 font-medium" role="alert">
+              {errorMessage}
+            </p>
+          )}
         </div>
       </div>
     </div>
