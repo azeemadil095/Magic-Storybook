@@ -7,8 +7,8 @@ import { getApiKey } from '../lib/gemini';
 
 export function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<{role: 'user'|'model', text: string}[]>([
-    { role: 'model', text: "Hi there! I'm your storybook helper. Ask me anything about the stories!" }
+  const [messages, setMessages] = useState<{id: string, role: 'user'|'model', text: string}[]>([
+    { id: crypto.randomUUID(), role: 'model', text: "Hi there! I'm your storybook helper. Ask me anything about the stories!" }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -24,32 +24,34 @@ export function Chatbot() {
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
-    const userMsg = input;
+    const userMsg = input.trim();
+    const userMessage = { id: crypto.randomUUID(), role: 'user' as const, text: userMsg };
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    const nextMessages = [...messages, userMessage];
+    setMessages(nextMessages);
     setIsLoading(true);
 
     try {
       const apiKey = getApiKey();
       const ai = new GoogleGenAI({ apiKey });
       
-      const history = messages.map(m => ({
+      const history = nextMessages.map(m => ({
         role: m.role,
         parts: [{ text: m.text }]
       }));
       
       const response = await ai.models.generateContent({
         model: 'gemini-3.1-pro-preview',
-        contents: [...history, { role: 'user', parts: [{ text: userMsg }] }],
+        contents: history,
         config: {
           systemInstruction: "You are a friendly, encouraging AI assistant in a children's storybook app. Answer questions simply, playfully, and keep it brief."
         }
       });
       
-      setMessages(prev => [...prev, { role: 'model', text: response.text || '' }]);
+      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', text: response.text || '' }]);
     } catch (e) {
       console.error(e);
-      setMessages(prev => [...prev, { role: 'model', text: "Oops! I had a little trouble thinking of an answer. Can you ask again?" }]);
+      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', text: "Oops! I had a little trouble thinking of an answer. Can you ask again?" }]);
     } finally {
       setIsLoading(false);
     }
@@ -58,6 +60,7 @@ export function Chatbot() {
   return (
     <>
       <button
+        aria-label="Open story helper chat"
         onClick={() => setIsOpen(true)}
         className="fixed bottom-6 right-6 w-14 h-14 bg-purple-600 text-white rounded-full shadow-xl flex items-center justify-center hover:bg-purple-700 transition-transform hover:scale-105 z-40 cursor-pointer"
       >
@@ -78,14 +81,14 @@ export function Chatbot() {
                 <MessageCircle size={20} />
                 <h3 className="font-semibold">Story Helper</h3>
               </div>
-              <button onClick={() => setIsOpen(false)} className="hover:bg-purple-700 p-1 rounded-md transition-colors cursor-pointer">
+              <button aria-label="Close story helper chat" onClick={() => setIsOpen(false)} className="hover:bg-purple-700 p-1 rounded-md transition-colors cursor-pointer">
                 <X size={20} />
               </button>
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-              {messages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {messages.map((msg) => (
+                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[80%] p-3 rounded-2xl ${
                     msg.role === 'user' 
                       ? 'bg-purple-600 text-white rounded-br-sm' 
@@ -113,7 +116,11 @@ export function Chatbot() {
 
             <div className="p-3 bg-white border-t border-gray-100">
               <div className="flex items-center gap-2 bg-gray-50 rounded-full px-4 py-2 border border-gray-200 focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-100 transition-all">
+                <label htmlFor="chat-input" className="sr-only">
+                  Ask a chat question
+                </label>
                 <input
+                  id="chat-input"
                   type="text"
                   value={input}
                   onChange={e => setInput(e.target.value)}
@@ -122,6 +129,7 @@ export function Chatbot() {
                   className="flex-1 bg-transparent outline-none text-sm text-gray-800 placeholder-gray-400"
                 />
                 <button 
+                  aria-label="Send chat message"
                   onClick={sendMessage}
                   disabled={!input.trim() || isLoading}
                   className="text-purple-600 disabled:text-gray-400 p-1 cursor-pointer"

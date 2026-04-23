@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getApiKey } from '../lib/gemini';
 
 declare global {
   interface Window {
@@ -21,8 +22,11 @@ export function ApiKeyPrompt({ onKeySelected }: { onKeySelected: () => void }) {
           onKeySelected();
         }
       } else {
-        setHasKey(true);
-        onKeySelected();
+        const hasConfiguredKey = Boolean(getApiKey());
+        setHasKey(hasConfiguredKey);
+        if (hasConfiguredKey) {
+          onKeySelected();
+        }
       }
     };
     checkKey();
@@ -39,6 +43,8 @@ export function ApiKeyPrompt({ onKeySelected }: { onKeySelected: () => void }) {
       }
     }
   };
+
+  const supportsAiStudioSelector = Boolean(window.aistudio?.openSelectKey);
 
   if (hasKey === null) return null;
   if (hasKey) return null;
@@ -65,9 +71,10 @@ export function ApiKeyPrompt({ onKeySelected }: { onKeySelected: () => void }) {
         </a>
         <button
           onClick={handleSelectKey}
+          disabled={!supportsAiStudioSelector}
           className="w-full bg-blue-600 text-white px-6 py-4 rounded-xl font-semibold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-[0.98] cursor-pointer"
         >
-          Select API Key
+          {supportsAiStudioSelector ? 'Select API Key' : 'Set GEMINI_API_KEY in .env.local'}
         </button>
       </div>
     </div>

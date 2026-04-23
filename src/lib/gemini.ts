@@ -1,11 +1,35 @@
 import { GoogleGenAI, Type, Modality } from '@google/genai';
+import type { Story } from '../types/story';
 
 export function getApiKey() {
-  return (window as any).process?.env?.API_KEY || process.env.GEMINI_API_KEY;
+  const viteKey = (import.meta as ImportMeta & { env?: { VITE_GEMINI_API_KEY?: string } }).env?.VITE_GEMINI_API_KEY;
+  const injectedKey = (window as Window & { process?: { env?: { API_KEY?: string } } }).process?.env?.API_KEY;
+  return viteKey || injectedKey || process.env.GEMINI_API_KEY || '';
 }
 
-export async function generateStory(topic: string) {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+let aiClient: GoogleGenAI | null = null;
+
+function getAiClient() {
+  if (!aiClient) {
+    aiClient = new GoogleGenAI({ apiKey: getApiKey() });
+  }
+  return aiClient;
+}
+
+function isStory(value: unknown): value is Story {
+  if (!value || typeof value !== 'object') return false;
+  const story = value as Story;
+  if (typeof story.title !== 'string' || !Array.isArray(story.pages)) return false;
+  return story.pages.every((page) => (
+    page &&
+    typeof page === 'object' &&
+    typeof page.text === 'string' &&
+    typeof page.imagePrompt === 'string'
+  ));
+}
+
+export async function generateStory(topic: string): Promise<Story> {
+  const ai = getAiClient();
   const response = await ai.models.generateContent({
     model: 'gemini-3.1-pro-preview',
     contents: `Write a short children's story about: ${topic}. The story should be 3-4 pages long. For each page, provide the text of the story and a detailed prompt for an image generator to create an illustration for that page. Make the story engaging and fun for kids!`,
@@ -32,11 +56,15 @@ export async function generateStory(topic: string) {
     }
   });
 
-  return JSON.parse(response.text);
+  const parsed: unknown = JSON.parse(response.text);
+  if (!isStory(parsed)) {
+    throw new Error('Model returned an invalid story format.');
+  }
+  return parsed;
 }
 
 export async function generateImage(prompt: string, size: string) {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = getAiClient();
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-image-preview',
     contents: {
@@ -59,7 +87,7 @@ export async function generateImage(prompt: string, size: string) {
 }
 
 export async function generateSpeech(text: string) {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = getAiClient();
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash-preview-tts',
     contents: [{ parts: [{ text }] }],
@@ -80,6 +108,8 @@ export async function generateSpeech(text: string) {
   throw new Error("No audio generated");
 }
 
+let audioCtx: AudioContext | null = null;
+
 export async function playPcmAudio(base64Data: string, sampleRate: number = 24000) {
   const binaryString = atob(base64Data);
   const len = binaryString.length;
@@ -94,7 +124,10 @@ export async function playPcmAudio(base64Data: string, sampleRate: number = 2400
     float32Data[i] = buffer[i] / 32768.0;
   }
 
-  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext!)();
+  }
+
   const audioBuffer = audioCtx.createBuffer(1, float32Data.length, sampleRate);
   audioBuffer.getChannelData(0).set(float32Data);
 

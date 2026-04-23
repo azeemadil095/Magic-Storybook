@@ -3,14 +3,16 @@ import { ApiKeyPrompt } from './components/ApiKeyPrompt';
 import { Chatbot } from './components/Chatbot';
 import { StoryReader } from './components/StoryReader';
 import { generateStory } from './lib/gemini';
+import type { Story } from './types/story';
 import { BookOpen, Sparkles, Loader2, Settings, ChevronLeft } from 'lucide-react';
 
 export default function App() {
   const [isKeySelected, setIsKeySelected] = useState(false);
   const [topic, setTopic] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [story, setStory] = useState<any>(null);
+  const [story, setStory] = useState<Story | null>(null);
   const [imageSize, setImageSize] = useState('1K');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleGenerateStory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,12 +20,13 @@ export default function App() {
     
     setIsGenerating(true);
     setStory(null);
+    setErrorMessage('');
     try {
       const newStory = await generateStory(topic);
       setStory(newStory);
     } catch (error) {
       console.error("Error generating story:", error);
-      alert("Failed to generate story. Please try again.");
+      setErrorMessage('Failed to generate story. Please try a different topic.');
     } finally {
       setIsGenerating(false);
     }
@@ -47,6 +50,7 @@ export default function App() {
                   <Settings className="w-4 h-4 text-amber-600" />
                   <span className="font-medium text-amber-800">Image Size:</span>
                   <select 
+                    aria-label="Choose generated image size"
                     value={imageSize} 
                     onChange={(e) => setImageSize(e.target.value)}
                     className="bg-transparent font-bold text-amber-700 outline-none cursor-pointer"
@@ -70,7 +74,11 @@ export default function App() {
                 <p className="text-lg text-gray-600 mb-8">Enter a topic and our magical AI will write a brand new story just for you!</p>
                 
                 <form onSubmit={handleGenerateStory} className="flex gap-3 max-w-lg mx-auto">
+                  <label htmlFor="story-topic" className="sr-only">
+                    Story topic
+                  </label>
                   <input
+                    id="story-topic"
                     type="text"
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
@@ -85,6 +93,11 @@ export default function App() {
                     Create
                   </button>
                 </form>
+                {errorMessage && (
+                  <p className="mt-4 text-red-600 font-medium" role="alert">
+                    {errorMessage}
+                  </p>
+                )}
               </div>
             )}
 
